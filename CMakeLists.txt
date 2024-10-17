@@ -22,6 +22,9 @@ endif ()
 if (EMSCRIPTEN)
     # Generate a full web page rather than a simple WebAssembly module
     set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".html")
+
+    # Enable the use of emscripten_sleep()
+    target_link_options(${PROJECT_NAME} PRIVATE -sASYNCIFY)
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
