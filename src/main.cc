@@ -1,3 +1,4 @@
+#include <GLFW/glfw3.h>
 #include <webgpu/webgpu.h>
 #include <cassert>
 #include <iostream>
@@ -331,6 +332,34 @@ int main() {
 
     // Release command queue
     wgpuQueueRelease(queue);
+
+    // GLFW BASIC
+    if (!glfwInit()) {
+        std::cerr << "Could not initialize GLFW!" << std::endl;
+        return 1;
+    }
+
+    // Create the window
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // <-- extra info for glfwCreateWindow
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    GLFWwindow *window = glfwCreateWindow(640, 480, "Learn WebGPU", nullptr, nullptr);
+
+    if (!window) {
+        std::cerr << "Could not open window!" << std::endl;
+        glfwTerminate();
+        return 1;
+    }
+
+    while (!glfwWindowShouldClose(window)) {
+        // Check whether the user clicked on the close button (and any other
+        // mouse/key event, which we don't use so far)
+        glfwPollEvents();
+    }
+
+    // At the end of the program, destroy the window
+    glfwDestroyWindow(window);
+
+    glfwTerminate();
 
     return 0;
 }

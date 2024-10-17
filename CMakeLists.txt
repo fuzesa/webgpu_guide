@@ -5,13 +5,27 @@ project(webgpu_guide_clion
 
 # Using Google Dawn instead of Mozilla wgpu
 set(WEBGPU_BACKEND DAWN)
+#set(WEBGPU_BACKEND WGPU)
+#set(WEBGPU_BACKEND EMSCRIPTEN)
+
+message(STATUS "WEBGPU_BACKEND IS ${WEBGPU_BACKEND}")
+
+# When using Google Dawn, make sure to add it BEFORE
+# the WebGPU distribution subdir
+if (NOT EMSCRIPTEN)
+    add_subdirectory(3rdparty/glfw)
+else()
+    # Emscripten has built-in support for GLFW but requires the `-sUSE_GLFW=3` link option:
+    add_library(glfw INTERFACE)
+    target_link_options(glfw INTERFACE -sUSE_GLFW=3)
+endif()
 
 add_subdirectory(3rdparty/WebGPU-distribution)
 
 add_executable(${PROJECT_NAME}
         src/main.cc)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE webgpu)
+target_link_libraries(${PROJECT_NAME} PRIVATE webgpu glfw)
 
 # In case of Mozilla wgpu, we need to copy the lib
 if (WEBGPU_BACKEND MATCHES "WGPU")
@@ -19,7 +33,7 @@ if (WEBGPU_BACKEND MATCHES "WGPU")
 endif ()
 
 # Options that are specific to Emscripten
-if (EMSCRIPTEN)
+if (WEBGPU_BACKEND MATCHES "EMSCRIPTEN")
     # Generate a full web page rather than a simple WebAssembly module
     set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".html")
 
