@@ -1,0 +1,8 @@
+[submodule "3rdparty/WebGPU-distribution"]
+	path = 3rdparty/WebGPU-distribution
+	url = https://github.com/eliemichel/WebGPU-distribution.git
+	branch = main-v0.2.0
+[submodule "3rdparty/glfw"]
+	path = 3rdparty/glfw
+	url = https://github.com/glfw/glfw.git
+	branch = 3.4
