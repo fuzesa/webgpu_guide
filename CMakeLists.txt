@@ -3,8 +3,26 @@ project(webgpu_guide_clion
         VERSION 1.0.0
         LANGUAGES CXX C)
 
+# Using Google Dawn instead of Mozilla wgpu
+set(WEBGPU_BACKEND DAWN)
+
+add_subdirectory(3rdparty/WebGPU-distribution)
+
 add_executable(${PROJECT_NAME}
         src/main.cc)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE webgpu)
+
+# In case of Mozilla wgpu, we need to copy the lib
+if (WEBGPU_BACKEND MATCHES "WGPU")
+    target_copy_webgpu_binaries(${PROJECT_NAME})
+endif ()
+
+# Options that are specific to Emscripten
+if (EMSCRIPTEN)
+    # Generate a full web page rather than a simple WebAssembly module
+    set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".html")
+endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
         CXX_STANDARD 17
