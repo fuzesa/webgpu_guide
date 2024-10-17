@@ -6,3 +6,7 @@
 	path = 3rdparty/glfw
 	url = https://github.com/glfw/glfw.git
 	branch = 3.4
+[submodule "3rdparty/glfw3webgpu"]
+	path = 3rdparty/glfw3webgpu
+	url = https://github.com/eliemichel/glfw3webgpu.git
+	branch = v1.2.0
