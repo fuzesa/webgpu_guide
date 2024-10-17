@@ -13,7 +13,7 @@
  * is roughly equivalent to
  *     const adapter = await navigator.gpu.requestAdapter(options);
  */
-WGPUAdapter requestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions const * options) {
+WGPUAdapter requestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions const *options) {
     // A simple structure holding the local information shared with the
     // onAdapterRequestEnded callback.
     struct UserData {
@@ -30,8 +30,9 @@ WGPUAdapter requestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions 
     // is to convey what we want to capture through the pUserData pointer,
     // provided as the last argument of wgpuInstanceRequestAdapter and received
     // by the callback as its last argument.
-    auto onAdapterRequestEnded = [](WGPURequestAdapterStatus status, WGPUAdapter adapter, char const * message, void * pUserData) {
-        UserData& userData = *static_cast<UserData*>(pUserData);
+    auto onAdapterRequestEnded = [](WGPURequestAdapterStatus status, WGPUAdapter adapter, char const *message,
+                                    void *pUserData) {
+        UserData &userData = *static_cast<UserData *>(pUserData);
         if (status == WGPURequestAdapterStatus_Success) {
             userData.adapter = adapter;
         } else {
@@ -45,7 +46,7 @@ WGPUAdapter requestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions 
         instance /* equivalent of navigator.gpu */,
         options,
         onAdapterRequestEnded,
-        (void*)&userData
+        (void *) &userData
     );
 
 
@@ -62,11 +63,100 @@ WGPUAdapter requestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions 
     return userData.adapter;
 }
 
+/**
+ * Utility function to get a WebGPU device, so that
+ *     WGPUAdapter device = requestDeviceSync(adapter, options);
+ * is roughly equivalent to
+ *     const device = await adapter.requestDevice(descriptor);
+ * It is very similar to requestAdapter
+ */
+WGPUDevice requestDeviceSync(WGPUAdapter adapter, WGPUDeviceDescriptor const *descriptor) {
+    struct UserData {
+        WGPUDevice device = nullptr;
+        bool requestEnded = false;
+    };
+    UserData userData;
+
+    auto onDeviceRequestEnded = [](WGPURequestDeviceStatus status, WGPUDevice device, char const *message,
+                                   void *pUserData) {
+        UserData &userData = *static_cast<UserData *>(pUserData);
+        if (status == WGPURequestDeviceStatus_Success) {
+            userData.device = device;
+        } else {
+            std::cout << "Could not get WebGPU device: " << message << std::endl;
+        }
+        userData.requestEnded = true;
+    };
+
+    wgpuAdapterRequestDevice(
+        adapter,
+        descriptor,
+        onDeviceRequestEnded,
+        (void *) &userData
+    );
+
+#ifdef __EMSCRIPTEN__
+    while (!userData.requestEnded) {
+        emscripten_sleep(100);
+    }
+#endif // __EMSCRIPTEN__
+
+    assert(userData.requestEnded);
+
+    return userData.device;
+}
+
+// We also add an inspect device function:
+void inspectDevice(WGPUDevice device) {
+    std::vector<WGPUFeatureName> features;
+    size_t featureCount = wgpuDeviceEnumerateFeatures(device, nullptr);
+    features.resize(featureCount);
+    wgpuDeviceEnumerateFeatures(device, features.data());
+
+    std::cout << "Device features:" << std::endl;
+    std::cout << std::hex;
+    for (auto f: features) {
+        std::cout << " - 0x" << f << std::endl;
+    }
+    std::cout << std::dec;
+
+    WGPUSupportedLimits limits = {};
+    limits.nextInChain = nullptr;
+
+#ifdef WEBGPU_BACKEND_DAWN
+    bool success = wgpuDeviceGetLimits(device, &limits) == WGPUStatus_Success;
+#else
+    bool success = wgpuDeviceGetLimits(device, &limits);
+#endif
+
+    if (success) {
+        std::cout << "Device limits:" << std::endl;
+        std::cout << " - maxTextureDimension1D: " << limits.limits.maxTextureDimension1D << std::endl;
+        std::cout << " - maxTextureDimension2D: " << limits.limits.maxTextureDimension2D << std::endl;
+        std::cout << " - maxTextureDimension3D: " << limits.limits.maxTextureDimension3D << std::endl;
+        std::cout << " - maxTextureArrayLayers: " << limits.limits.maxTextureArrayLayers << std::endl;
+    }
+}
+
 int main() {
     // Create WebGPU instance
     // We create a descriptor
     WGPUInstanceDescriptor desc = {};
     desc.nextInChain = nullptr;
+
+#ifdef WEBGPU_BACKEND_DAWN
+    // Make sure the uncaptured error callback is called as soon as an error
+    // occurs rather than at the next call to "wgpuDeviceTick".
+    WGPUDawnTogglesDescriptor toggles;
+    toggles.chain.next = nullptr;
+    toggles.chain.sType = WGPUSType_DawnTogglesDescriptor;
+    toggles.disabledToggleCount = 0;
+    toggles.enabledToggleCount = 1;
+    const char* toggleName = "enable_immediate_error_handling";
+    toggles.enabledToggles = &toggleName;
+
+    desc.nextInChain = &toggles.chain;
+#endif // WEBGPU_BACKEND_DAWN
 
     // We create the instance using this descriptor
 #ifdef WEBGPU_BACKEND_EMSCRIPTEN
@@ -128,7 +218,7 @@ int main() {
 
     std::cout << "Adapter features:" << std::endl;
     std::cout << std::hex; // Write integers as hexadecimal to ease comparison with webgpu.h literals
-    for (auto f : features) {
+    for (auto f: features) {
         std::cout << " - 0x" << f << std::endl;
     }
     std::cout << std::dec; // Restore decimal numbers
@@ -157,11 +247,44 @@ int main() {
     std::cout << " - backendType: 0x" << properties.backendType << std::endl;
     std::cout << std::dec; // Restore decimal numbers
 
+    // DEVICE REQUEST
+    std::cout << "Requesting device..." << std::endl;
+
+    WGPUDeviceDescriptor deviceDesc = {};
+
+    WGPUDevice device = requestDeviceSync(adapter, &deviceDesc);
+
+    deviceDesc.nextInChain = nullptr;
+    deviceDesc.label = "My Device"; // anything works here, that's your call
+    deviceDesc.requiredFeatureCount = 0; // we do not require any specific feature
+    deviceDesc.requiredLimits = nullptr; // we do not require any specific limit
+    deviceDesc.defaultQueue.nextInChain = nullptr;
+    deviceDesc.defaultQueue.label = "The default queue";
+
+    // A function that is invoked whenever the device stops being available.
+    deviceDesc.deviceLostCallback = [](WGPUDeviceLostReason reason, char const *message, void * /* pUserData */) {
+        std::cout << "Device lost: reason " << reason;
+        if (message) std::cout << " (" << message << ")";
+        std::cout << std::endl;
+    };
+
+    auto onDeviceError = [](WGPUErrorType type, char const* message, void* /* pUserData */) {
+        std::cout << "Uncaptured device error: type " << type;
+        if (message) std::cout << " (" << message << ")";
+        std::cout << std::endl;
+    };
+    wgpuDeviceSetUncapturedErrorCallback(device, onDeviceError, nullptr /* pUserData */);
+
+    std::cout << "Got device: " << device << std::endl;
+
     // We clean up the WebGPU instance
     wgpuInstanceRelease(instance);
 
     // Release adapter
     wgpuAdapterRelease(adapter);
+
+    // Release device
+    wgpuDeviceRelease(device);
 
     return 0;
 }
