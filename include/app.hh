@@ -37,8 +37,11 @@ class Application {
   WGPUDevice device = nullptr;
   WGPUQueue queue = nullptr;
   WGPUSurface surface = nullptr;
+  WGPUTextureFormat surfaceFormat = WGPUTextureFormat_Undefined;
+  WGPURenderPipeline pipeline = nullptr;
 
   WGPUTextureView GetNextSurfaceTextureView();
+  void InitializePipeline();
 };
 
 #endif
