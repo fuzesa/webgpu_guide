@@ -25,7 +25,7 @@ add_subdirectory(3rdparty/WebGPU-distribution)
 add_subdirectory(3rdparty/glfw3webgpu)
 
 add_executable(${PROJECT_NAME}
-#        src/app.cc
+        src/app.cc
         src/webgpu_utils.cc
         src/main.cc)
 
